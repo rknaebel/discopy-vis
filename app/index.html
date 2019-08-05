@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"/>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8"/>
+
+    <title>Shallow Discourse Parsing</title>
+
+    <!-- Required Stylesheets -->
+    <link
+            type="text/css"
+            rel="stylesheet"
+            href="https://unpkg.com/bootstrap/dist/css/bootstrap.min.css"
+    />
+    <link
+            type="text/css"
+            rel="stylesheet"
+            href="https://unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue.css"
+    />
+
+    <!-- Required scripts -->
+    <script src="https://unpkg.com/vue"></script>
+    <script src="https://unpkg.com/babel-polyfill@latest/dist/polyfill.min.js"></script>
+    <script src="https://unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue-resource@1.5.1"></script>
+</head>
+<body>
+<!-- Our application root element -->
+<div id="app">
+    <b-container>
+        <b-jumbotron header="Shallow Discourse Parsing" lead="Interactive Demo">
+        </b-jumbotron>
+        <b-form @submit="onSubmit" @reset="onReset">
+            <b-form-group>
+                <b-form-textarea
+                        id="textarea"
+                        v-model="text"
+                        placeholder="Enter your discourse..."
+                        rows="20"
+                />
+            </b-form-group>
+            <b-button type="submit" variant="primary">Submit</b-button>
+            <b-button type="reset" variant="danger">Reset</b-button>
+        </b-form>
+    </b-container>
+    <b-container>
+        <p>[[ tokens.join(' ') ]]</p>
+        <ol>
+            <li v-for="relation in relations">[[ relation ]]</li>
+        </ol>
+    </b-container>
+</div>
+
+<!-- Start running your app -->
+<script>
+    window.app = new Vue({
+        el: '#app',
+        data: {
+            text: '',
+            relations: [],
+            tokens: []
+        },
+        delimiters:
+            ['[[', ']]'],
+        computed: {},
+        methods: {
+            onSubmit(evt) {
+                evt.preventDefault()
+                // alert(JSON.stringify(this.text))
+                this.$http.post('http://127.0.0.1:5000/predict', {
+                    crossdomain: true,
+                    text: this.text
+                }).then((response) => {
+                    this.relations = response.data.relations
+                    this.tokens = response.data.Tokens
+                })
+            },
+            onReset(evt) {
+                evt.preventDefault()
+                /* Reset our form values */
+                this.text = ''
+            }
+        }
+    })
+</script>
+</body>
+</html>
