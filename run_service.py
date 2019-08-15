@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # coding: utf-8
 import argparse
+import json
 
 import flask
 from flask_cors import CORS
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--parser-ip", help="",
@@ -31,6 +31,8 @@ def predict():
 
         # TODO do something with the raw text
         data["text"] = json_obj['text']
+
+        data = json.load(open('app/dummy.json', 'r'))
 
         # indicate that the request was a success
         data["success"] = True
