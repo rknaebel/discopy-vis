@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Discopy</title>
+    <meta charset="utf-8">
+    <meta content="IE=edge" http-equiv="X-UA-Compatible">
+    <meta content="width=device-width,initial-scale=1.0" name="viewport">
+    <link href="/static/favicon.ico" rel="icon">
+    <!-- CSS only -->
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/my.css" rel="stylesheet">
+    <!-- JS, Popper.js, and jQuery -->
+    <script src="/static/js/jquery-3.5.1.slim.min.js"></script>
+    <script src="/static/js/popper.min.js"></script>
+    <script src="/static/js/bootstrap.min.js"></script>
+    <script src="/static/js/vue.js"></script>
+    <script src="/static/js/axios.min.js"></script>
+</head>
+<body>
+<div class="container" id="app">
+    <h1>Shallow Discourse Parser</h1>
+    <div class="row d-block">
+        <div class="search-wrapper panel-heading">
+            <input class="form-control" type="text" v-model="searchQuery" placeholder="Search"/>
+        </div>
+        <div class="d-block" v-if="resultQuery.length">
+            <div class="list-group"
+                 style="max-height: 300px;margin-bottom: 10px;overflow:scroll;-webkit-overflow-scrolling: touch;">
+                <a href="#" class="list-group-item"
+                   v-for="docId in resultQuery"
+                   v-bind:class="{ 'active' : isSelected(docId) }"
+                   v-on:click="selectDocument(docId)">${ docId }</a>
+            </div>
+        </div>
+        <div class="row" v-if="docId && doc">
+            <div>
+                <h2>${this.docId}</h2>
+            </div>
+            <div>
+                <p class="text-center" v-html="doc.text"></p>
+            </div>
+            <div>
+                <ul>
+                    <li v-for="rel in doc.relations">${rel.Connective.RawText}</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    var app = new Vue({
+        el: '#app',
+        delimiters: ['${', '}'],
+        data: {
+            docId: "",
+            doc: null,
+            documents: "",
+            searchQuery: null,
+        },
+        methods: {
+            selectDocument(v) {
+                this.docId = v;
+                axios.get('/api/document/' + v).then((res) => {
+                    this.doc = res.data;
+                }).catch((error) => {
+                    console.error(error);
+                });
+            },
+            isSelected(i) {
+                return i === this.docId
+            }
+        },
+        created() {
+            axios.get('/api/documents').then((res) => {
+                this.documents = res.data;
+            })
+        },
+        computed: {
+            resultQuery() {
+                if (this.searchQuery) {
+                    return this.documents.filter((item) => {
+                        return item.toLowerCase().includes(this.searchQuery.toLowerCase())
+                    })
+                } else {
+                    return this.documents;
+                }
+            }
+
+        }
+    })
+</script>
+</body>
+</html>

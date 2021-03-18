@@ -1,0 +1,31 @@
+mark {
+    background-color: #d39e00;
+}
+
+.Arg1 {
+    margin: 5px 0;
+    padding: 0 5px;
+    border: 2px solid rgb(66, 208, 217);
+    color: rgb(71, 81, 92);
+    background: rgb(195, 254, 255);
+}
+
+.Arg2 {
+    margin: 5px 0;
+    padding: 0 5px;
+    border: 2px solid rgb(71, 207, 164);
+    color: rgb(71, 81, 92);
+    background: rgb(210, 255, 227);
+}
+
+.Conn {
+    margin: 5px 0;
+    padding: 0 5px;
+    border: 2px solid rgb(35, 118, 229);
+    color: rgb(71, 81, 92);
+    background: rgb(193, 218, 255);
+}
+
+.relation {
+    padding: 5px 0;
+}

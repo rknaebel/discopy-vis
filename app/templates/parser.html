@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Discopy</title>
+    <meta charset="utf-8">
+    <meta content="IE=edge" http-equiv="X-UA-Compatible">
+    <meta content="width=device-width,initial-scale=1.0" name="viewport">
+    <link href="/static/favicon.ico" rel="icon">
+    <!-- CSS only -->
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/my.css" rel="stylesheet">
+    <!-- JS, Popper.js, and jQuery -->
+    <script src="/static/js/jquery-3.5.1.slim.min.js"></script>
+    <script src="/static/js/popper.min.js"></script>
+    <script src="/static/js/bootstrap.min.js"></script>
+    <script src="/static/js/vue.js"></script>
+    <script src="/static/js/axios.min.js"></script>
+</head>
+<body>
+<div class="container" id="app">
+    {% include 'navbar.html' %}
+    <div class="d-block">
+        <div class="form-group">
+            <textarea v-model="text" style="min-width: 100%; min-height: 200px"></textarea>
+            <button class="btn btn-block btn-lg btn-secondary" v-on:click="text=''">Clear</button>
+            <button class="btn btn-block btn-lg btn-primary" v-on:click="handleSubmit">Parse Text</button>
+        </div>
+        <div v-if="relations">
+            <h2>Discourse Relations</h2>
+            <div>
+                <span class="Arg1">First Argument</span>
+                <span class="Conn">Connective</span>
+                <span class="Arg2">Second Argument</span>
+            </div>
+            <div class="relation" v-for="(rel, index) in relations">
+                <div>
+                    <span style="font-weight: bold">${index + 1} ${rel.type}</span>
+                    <span v-if="rel.sense" style="font-style: italic"> - ${rel.sense}</span>
+                </div>
+                <span v-for="t in rel.tokens" v-bind:class="t.class">${t.surface} </span>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    var app = new Vue({
+        el: '#app',
+        delimiters: ['${', '}'],
+        data: {
+            docId: "",
+            sentences: null,
+            relations: null,
+            documents: "",
+            searchQuery: null,
+            text: "",
+        },
+        methods: {
+            selectDocument(v) {
+                this.docId = v;
+                axios.get('/api/sentences/' + v).then((res) => {
+                    this.sentences = res.data;
+                    this.text = this.sentences.map(s => s["words"].map(x => x[0]).join(" ")).join(" ");
+                }).catch((error) => {
+                    console.error(error);
+                });
+            },
+            isSelected(i) {
+                return i === this.docId
+            },
+            handleSubmit() {
+                if (this.text.length <= 0) {
+                    return
+                }
+                axios.post('/api/parser', {
+                    'text': this.text
+                }).then((res) => {
+                    this.relations = res.data;
+                });
+            }
+        },
+        created() {
+            axios.get('/api/docs').then((res) => {
+                this.documents = res.data;
+            })
+        },
+        computed: {
+            resultQuery() {
+                if (this.searchQuery) {
+                    return this.documents.filter((item) => {
+                        return item.toLowerCase().includes(this.searchQuery.toLowerCase())
+                    })
+                } else {
+                    return this.documents;
+                }
+            }
+
+        }
+    })
+</script>
+</body>
+</html>
