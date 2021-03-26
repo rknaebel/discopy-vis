@@ -20,7 +20,7 @@
 <div class="container" id="app">
     {% include 'navbar.html' %}
     <div class="d-block">
-        <h2>WSJ Samples</h2>
+        <h2>Documents</h2>
         <div class="search-wrapper panel-heading">
             <input class="form-control" type="text" v-model="searchQuery" placeholder="Search"/>
         </div>
@@ -34,29 +34,28 @@
         </div>
     </div>
     <div class="d-block" v-if="docId && sentences">
-        <div class="d-block" v-if="docId && text">
-            <div>
-                <h2>Document (${this.docId})</h2>
-            </div>
-            <div>
-                <p>${text}</p>
-            </div>
-            <button class="btn btn-block btn-lg btn-primary" v-on:click="handleSubmit">Parse Text</button>
+        <div>
+            <h2>Document (${this.docId})</h2>
         </div>
-        <div v-if="relations">
-            <h2>Discourse Relations</h2>
+        <div>
+            <p>
+                <span v-for="s in sentences">${s["words"].map(x => x[0]).join(" ")} </span>
+            </p>
+        </div>
+    </div>
+    <div class="d-block" v-if="docId && sentences">
+        <h2>Discourse Relations</h2>
+        <div>
+            <span class="Arg1">First Argument</span>
+            <span class="Conn">Connective</span>
+            <span class="Arg2">Second Argument</span>
+        </div>
+        <div class="relation" v-for="(rel, index) in relationsQuery">
             <div>
-                <span class="Arg1">First Argument</span>
-                <span class="Conn">Connective</span>
-                <span class="Arg2">Second Argument</span>
+                <span style="font-weight: bold">${index + 1} ${rel.type}</span>
+                <span v-if="rel.sense" style="font-style: italic"> - ${rel.sense}</span>
             </div>
-            <div class="relation" v-for="(rel, index) in relations">
-                <div>
-                    <span style="font-weight: bold">${index + 1} ${rel.type}</span>
-                    <span v-if="rel.sense" style="font-style: italic"> - ${rel.sense}</span>
-                </div>
-                <span v-for="t in rel.tokens" v-bind:class="t.class">${t.surface} </span>
-            </div>
+            <span v-for="t in rel.tokens" v-bind:class="t.class">${t.surface} </span>
         </div>
     </div>
 </div>
@@ -67,39 +66,31 @@
         data: {
             docId: "",
             sentences: null,
-            relations: null,
+            relations: [],
             documents: "",
             searchQuery: null,
-            text: "",
+            relationTypes: [],
         },
         methods: {
             selectDocument(v) {
                 this.docId = v;
-                axios.get('/api/sentences/' + v).then((res) => {
+                axios.get('/api/sentences/pred/' + v).then((res) => {
                     this.sentences = res.data;
-                    this.text = this.sentences.map(s => s["words"].map(x => x[0]).join(" ")).join(" ");
                 }).catch((error) => {
                     console.error(error);
                 });
-                // axios.get('/api/relations/' + v).then((res) => {
-                //     this.relations = res.data;
-                // }).catch((error) => {
-                //     console.error(error);
-                // });
+                axios.get('/api/relations/pred/' + v).then((res) => {
+                    this.relations = res.data;
+                }).catch((error) => {
+                    console.error(error);
+                });
             },
             isSelected(i) {
                 return i === this.docId
-            },
-            handleSubmit() {
-                axios.post('/api/parser', {
-                    'text': this.text
-                }).then((res) => {
-                    this.relations = res.data;
-                });
             }
         },
         created() {
-            axios.get('/api/docs').then((res) => {
+            axios.get('/api/docs/pred').then((res) => {
                 this.documents = res.data;
             })
         },
@@ -111,6 +102,15 @@
                     })
                 } else {
                     return this.documents;
+                }
+            },
+            relationsQuery() {
+                if (this.relationTypes.length > 0) {
+                    return this.relations.filter(r => {
+                        return this.relationTypes.map(t => t.toLowerCase()).includes(r.type.toLowerCase())
+                    })
+                } else {
+                    return this.relations;
                 }
             }
 
