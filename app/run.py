@@ -18,6 +18,7 @@ arg_parser = ArgumentParser()
 arg_parser.add_argument("--hostname", default="0.0.0.0", type=str, help="REST API hostname")
 arg_parser.add_argument("--port", default=8080, type=int, help="REST API port")
 arg_parser.add_argument("--data", default='data', type=str, help="path to corpora")
+arg_parser.add_argument("--limit", default=100, type=int, help="number of documents per corpus")
 arg_parser.add_argument("--reload", action="store_true", help="Reload service on file changes")
 args = arg_parser.parse_args()
 
@@ -39,6 +40,10 @@ simple_map = {
 DOCS = defaultdict(dict)
 PARSES = defaultdict(dict)
 
+DOCUMENTS = {
+    "gold": DOCS,
+    "pred": PARSES,
+}
 
 # TOKENS = {
 #     "abc1223": "rene.knaebel"
@@ -51,13 +56,6 @@ PARSES = defaultdict(dict)
 #     else:
 #         raise HTTPException(status_code=404, detail="Invalid Access Token")
 #
-#
-# @app.get("/api/docs", tags=["api"])
-# async def get_documents(user: str = Depends(user_access_token)):
-#     print(user)
-#     r = requests.get('http://localhost:5000/api/docs')
-#     if r.status_code == 200:
-#         return r.json()
 
 @app.on_event("startup")
 async def startup_event():
@@ -65,123 +63,78 @@ async def startup_event():
     for corpus in glob.glob(os.path.join(args.data, 'gold') + '/*.json.bz2'):
         print("Load corpus:", corpus)
         with bz2.open(corpus) as fh:
-            for line in fh:
+            for line_i, line in enumerate(fh):
+                if args.limit and line_i >= args.limit:
+                    break
                 doc = json.loads(line)
                 DOCS[doc['docID']] = doc
     for corpus in glob.glob(os.path.join(args.data, 'parsed') + '/*.json.bz2'):
         print("Load corpus:", corpus)
         with bz2.open(corpus) as fh:
-            for line in fh:
+            for line_i, line in enumerate(fh):
+                if args.limit and line_i >= args.limit:
+                    break
                 doc = json.loads(line)
                 PARSES[doc['docID']] = doc
     print('Corpus loading done...')
 
 
-@app.get("/api/docs/gold", tags=["api"])
-async def get_gold_documents():
-    return [doc_id for doc_id in DOCS.keys()]
+@app.get("/api/docs", tags=["api"])
+async def get_documents(part: str = "gold"):
+    if part in DOCUMENTS:
+        return [doc['docID'] for doc in DOCUMENTS[part].values()]
+    else:
+        return []
 
 
-@app.get("/api/docs/pred", tags=["api"])
-async def get_pred_documents():
-    return [doc_id for doc_id in PARSES.keys()]
-
-
-@app.get("/api/docs/gold/{doc_id}", tags=["api"])
-async def get_document_gold_by_id(doc_id: str):
-    if doc_id in DOCS:
-        doc = DOCS[doc_id]
+@app.get("/api/docs/{doc_id}", tags=["api"])
+async def get_document_by_id(doc_id: str, part: str = "gold"):
+    if part in DOCUMENTS and doc_id in DOCUMENTS[part]:
+        doc = DOCUMENTS[part][doc_id]
         for sent in doc['sentences']:
             sent['words'] = [(simple_map.get(t[0], t[0]), t[1]) for t in sent['words']]
         return doc
 
 
-def get_document_by_id(doc_id, corpus):
-    if doc_id in corpus:
-        doc = corpus[doc_id]
-        for sent in doc['sentences']:
-            sent['words'] = [(simple_map.get(t[0], t[0]), t[1]) for t in sent['words']]
-        return doc
-
-
-@app.get("/api/docs/pred/{doc_id}", tags=["api"])
-async def get_document_pred_by_id(doc_id: str):
-    return get_document_by_id(doc_id, PARSES)
-
-
-@app.get("/api/sentences/gold/{doc_id}", tags=["api"])
-async def get_sentences_by_id(doc_id: str):
-    doc = await get_document_gold_by_id(doc_id)
+@app.get("/api/sentences/{doc_id}", tags=["api"])
+async def get_sentences_by_id(doc_id: str, part: str = "gold"):
+    doc = await get_document_by_id(doc_id, part)
     if doc:
         return doc['sentences']
 
 
-@app.get("/api/sentences/pred/{doc_id}", tags=["api"])
-async def get_sentences_by_id(doc_id: str):
-    doc = await get_document_pred_by_id(doc_id)
-    if doc:
-        return doc['sentences']
+def prepare_relation(rel, words):
+    arg1 = {i[2] for i in rel['Arg1']['TokenList']}
+    arg2 = {i[2] for i in rel['Arg2']['TokenList']}
+    conn = {i[2] for i in rel['Connective']['TokenList']}
+    min_pos = min(arg1 | arg2 | conn)
+    max_pos = max(arg1 | arg2 | conn)
+    tokens = [{
+        'surface': simple_map.get(w, w),
+        'class': "Arg1" if i in arg1 else "Arg2" if i in arg2 else "Conn" if i in conn else ""
+    } for i, w in enumerate(words)][max(min_pos - 10, 0):min(max_pos + 11, len(words))]
+    tmp = tokens[:1]
+    for t in tokens[1:]:
+        if t['class'] == tmp[-1]['class']:
+            tmp[-1]['surface'] += ' ' + t['surface']
+        else:
+            tmp.append(t)
+    r = {
+        'type': rel['Type'],
+        'sense': rel['Sense'][0],
+        'tokens': tmp,
+    }
+    return r
 
 
-@app.get("/api/relations/gold/{doc_id}", tags=["api"])
-async def get_relations_by_id(doc_id: str):
+@app.get("/api/relations/{doc_id}", tags=["api"])
+async def get_relations_by_id(doc_id: str, part: str = "gold"):
     relations = []
-    doc = await get_document_gold_by_id(doc_id)
+    doc = await get_document_by_id(doc_id, part)
     if doc:
         words = [w[0] for s in doc['sentences'] for w in s["words"]]
         for rel in doc['relations']:
-            arg1 = {i[2] for i in rel['Arg1']['TokenList']}
-            arg2 = {i[2] for i in rel['Arg2']['TokenList']}
-            conn = {i[2] for i in rel['Connective']['TokenList']}
-            min_pos = min(arg1 | arg2 | conn)
-            max_pos = max(arg1 | arg2 | conn)
-            tokens = [{
-                'surface': simple_map.get(w, w),
-                'class': "Arg1" if i in arg1 else "Arg2" if i in arg2 else "Conn" if i in conn else ""
-            } for i, w in enumerate(words)][max(min_pos - 10, 0):min(max_pos + 11, len(words))]
-            tmp = tokens[:1]
-            for t in tokens[1:]:
-                if t['class'] == tmp[-1]['class']:
-                    tmp[-1]['surface'] += ' ' + t['surface']
-                else:
-                    tmp.append(t)
-            r = {
-                'type': rel['Type'],
-                'sense': rel['Sense'][0],
-                'tokens': tmp,
-            }
-            relations.append(r)
-        return relations
-
-
-@app.get("/api/relations/pred/{doc_id}", tags=["api"])
-async def get_relations_pred_by_id(doc_id: str):
-    relations = []
-    doc = await get_document_pred_by_id(doc_id)
-    if doc:
-        words = [w[0] for s in doc['sentences'] for w in s["words"]]
-        for rel in doc['relations']:
-            arg1 = {i[2] for i in rel['Arg1']['TokenList']}
-            arg2 = {i[2] for i in rel['Arg2']['TokenList']}
-            conn = {i[2] for i in rel['Connective']['TokenList']}
-            min_pos = min(arg1 | arg2 | conn)
-            max_pos = max(arg1 | arg2 | conn)
-            tokens = [{
-                'surface': simple_map.get(w, w),
-                'class': "Arg1" if i in arg1 else "Arg2" if i in arg2 else "Conn" if i in conn else ""
-            } for i, w in enumerate(words)][max(min_pos - 10, 0):min(max_pos + 11, len(words))]
-            tmp = tokens[:1]
-            for t in tokens[1:]:
-                if t['class'] == tmp[-1]['class']:
-                    tmp[-1]['surface'] += ' ' + t['surface']
-                else:
-                    tmp.append(t)
-            r = {
-                'type': rel['Type'],
-                'sense': rel['Sense'][0],
-                'tokens': tmp,
-            }
-            relations.append(r)
+            relations.append(prepare_relation(rel, words))
         return relations
 
 
@@ -199,27 +152,7 @@ def apply_parser(r: ParserRequest):
         relations = []
         words = [w[0] for s in doc['sentences'] for w in s["words"]]
         for rel in doc['relations']:
-            arg1 = {i[2] for i in rel['Arg1']['TokenList']}
-            arg2 = {i[2] for i in rel['Arg2']['TokenList']}
-            conn = {i[2] for i in rel['Connective']['TokenList']}
-            min_pos = min(arg1 | arg2 | conn)
-            max_pos = max(arg1 | arg2 | conn)
-            tokens = [{
-                'surface': simple_map.get(w, w),
-                'class': "Arg1" if i in arg1 else "Arg2" if i in arg2 else "Conn" if i in conn else ""
-            } for i, w in enumerate(words)][max(min_pos - 10, 0):min(max_pos + 11, len(words))]
-            tmp = tokens[:1]
-            for t in tokens[1:]:
-                if t['class'] == tmp[-1]['class']:
-                    tmp[-1]['surface'] += ' ' + t['surface']
-                else:
-                    tmp.append(t)
-            r = {
-                'type': rel['Type'],
-                'sense': rel['Sense'][0],
-                'tokens': tmp,
-            }
-            relations.append(r)
+            relations.append(prepare_relation(rel, words))
         return relations
     else:
         return 404

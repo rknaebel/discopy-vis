@@ -90,12 +90,12 @@
         methods: {
             selectDocument(v) {
                 this.docId = v;
-                axios.get('/api/sentences/gold/' + v).then((res) => {
+                axios.get('/api/sentences/' + v, {params: {part: "gold"}}).then((res) => {
                     this.sentences = res.data;
                 }).catch((error) => {
                     console.error(error);
                 });
-                axios.get('/api/relations/gold/' + v).then((res) => {
+                axios.get('/api/relations/' + v, {params: {part: "gold"}}).then((res) => {
                     this.relations = res.data;
                 }).catch((error) => {
                     console.error(error);
@@ -106,7 +106,7 @@
             }
         },
         created() {
-            axios.get('/api/docs/gold').then((res) => {
+            axios.get('/api/docs', {params: {part: "gold"}}).then((res) => {
                 this.documents = res.data;
             })
         },

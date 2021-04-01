@@ -74,12 +74,12 @@
         methods: {
             selectDocument(v) {
                 this.docId = v;
-                axios.get('/api/sentences/pred/' + v).then((res) => {
+                axios.get('/api/sentences/' + v, {params: {part: "pred"}}).then((res) => {
                     this.sentences = res.data;
                 }).catch((error) => {
                     console.error(error);
                 });
-                axios.get('/api/relations/pred/' + v).then((res) => {
+                axios.get('/api/relations/' + v, {params: {part: "pred"}}).then((res) => {
                     this.relations = res.data;
                 }).catch((error) => {
                     console.error(error);
@@ -90,7 +90,7 @@
             }
         },
         created() {
-            axios.get('/api/docs/pred').then((res) => {
+            axios.get('/api/docs', {params: {part: "pred"}}).then((res) => {
                 this.documents = res.data;
             })
         },
