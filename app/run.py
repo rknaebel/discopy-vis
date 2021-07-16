@@ -1,23 +1,18 @@
-import bz2
-import glob
-import ujson as json
-import os
 from argparse import ArgumentParser
-from collections import defaultdict
 
 import requests
 import uvicorn
-from typing import Optional
-from fastapi import FastAPI, Request, Depends, HTTPException
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic.main import BaseModel
+from pymongo import MongoClient
 
 arg_parser = ArgumentParser()
+arg_parser.add_argument("--root-path", default="", type=str, help="REST API hostname")
 arg_parser.add_argument("--hostname", default="0.0.0.0", type=str, help="REST API hostname")
 arg_parser.add_argument("--port", default=8080, type=int, help="REST API port")
-arg_parser.add_argument("--data", default='data', type=str, help="path to corpora")
 arg_parser.add_argument("--limit", default=100, type=int, help="number of documents per corpus")
 arg_parser.add_argument("--reload", action="store_true", help="Reload service on file changes")
 args = arg_parser.parse_args()
@@ -37,63 +32,33 @@ simple_map = {
     "n't": "not"
 }
 
-DOCS = defaultdict(dict)
-PARSES = defaultdict(dict)
-
-DOCUMENTS = {
-    "gold": DOCS,
-    "pred": PARSES,
-}
-
-# TOKENS = {
-#     "abc1223": "rene.knaebel"
-# }
-#
-#
-# async def user_access_token(access_token: Optional[str] = None):
-#     if access_token in TOKENS:
-#         return TOKENS[access_token]
-#     else:
-#         raise HTTPException(status_code=404, detail="Invalid Access Token")
-#
-
-@app.on_event("startup")
-async def startup_event():
-    global DOCS, PARSES
-    for corpus in glob.glob(os.path.join(args.data, 'gold') + '/*.json.bz2'):
-        print("Load corpus:", corpus)
-        with bz2.open(corpus) as fh:
-            for line_i, line in enumerate(fh):
-                if args.limit and line_i >= args.limit:
-                    break
-                doc = json.loads(line)
-                DOCS[doc['docID']] = doc
-    for corpus in glob.glob(os.path.join(args.data, 'parsed') + '/*.json.bz2'):
-        print("Load corpus:", corpus)
-        with bz2.open(corpus) as fh:
-            for line_i, line in enumerate(fh):
-                if args.limit and line_i >= args.limit:
-                    break
-                doc = json.loads(line)
-                PARSES[doc['docID']] = doc
-    print('Corpus loading done...')
-
 
 @app.get("/api/docs", tags=["api"])
 async def get_documents(part: str = "gold"):
-    if part in DOCUMENTS:
-        return [doc['docID'] for doc in DOCUMENTS[part].values()]
-    else:
-        return []
+    db = MongoClient('localhost', 27017)['discopy']['docs']
+    docs = db.find({'meta.part': part}, {'docID': 1})
+    return [doc['docID'] for doc in docs]
 
 
 @app.get("/api/docs/{doc_id}", tags=["api"])
 async def get_document_by_id(doc_id: str, part: str = "gold"):
-    if part in DOCUMENTS and doc_id in DOCUMENTS[part]:
-        doc = DOCUMENTS[part][doc_id]
+    db = MongoClient('localhost', 27017)['discopy']['docs']
+    doc = db.find_one({'meta.part': part, 'docID': doc_id})
+    if doc:
         for sent in doc['sentences']:
             sent['words'] = [(simple_map.get(t[0], t[0]), t[1]) for t in sent['words']]
         return doc
+
+
+@app.get("/api/corpora", tags=["api"])
+async def get_corpora():
+    db = MongoClient('localhost', 27017)['discopy']['docs']
+    return {
+        'pred': [{'corpus': i['_id'], 'count': i['count']} for i in db.aggregate(
+            [{'$match': {'meta.part': 'pred'}}, {'$group': {'_id': '$meta.corpus', 'count': {'$sum': 1}}}])],
+        'gold': [{'corpus': i['_id'], 'count': i['count']} for i in db.aggregate(
+            [{'$match': {'meta.part': 'gold'}}, {'$group': {'_id': '$meta.corpus', 'count': {'$sum': 1}}}])]
+    }
 
 
 @app.get("/api/sentences/{doc_id}", tags=["api"])
@@ -144,11 +109,13 @@ class ParserRequest(BaseModel):
 
 @app.post("/api/parser")
 def apply_parser(r: ParserRequest):
+    db = MongoClient('localhost', 27017)['discopy']['requests']
     r = requests.post('http://localhost:5000/api/parser', json={
         'text': r.text,
     })
     if r.status_code == 200:
         doc = r.json()
+        db.insert_one(doc)
         relations = []
         words = [w[0] for s in doc['sentences'] for w in s["words"]]
         for rel in doc['relations']:
@@ -159,6 +126,7 @@ def apply_parser(r: ParserRequest):
 
 
 @app.get("/", tags=["templates"], response_class=HTMLResponse)
+@app.get("/index", tags=["templates"], response_class=HTMLResponse)
 async def get_main_page(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
@@ -179,4 +147,5 @@ async def get_parser_page(request: Request):
 
 
 if __name__ == '__main__':
-    uvicorn.run("run:app", host=args.hostname, port=args.port, log_level="debug", reload=args.reload)
+    uvicorn.run("run:app", host=args.hostname, port=args.port, log_level="debug", reload=args.reload,
+                root_path=args.root_path)
