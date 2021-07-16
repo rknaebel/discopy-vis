@@ -5,16 +5,16 @@
     <meta charset="utf-8">
     <meta content="IE=edge" http-equiv="X-UA-Compatible">
     <meta content="width=device-width,initial-scale=1.0" name="viewport">
-    <link href="/static/favicon.ico" rel="icon">
+    <link href="static/favicon.ico" rel="icon">
     <!-- CSS only -->
-    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
-    <link href="/static/css/my.css" rel="stylesheet">
+    <link href="static/css/bootstrap.min.css" rel="stylesheet">
+    <link href="static/css/my.css" rel="stylesheet">
     <!-- JS, Popper.js, and jQuery -->
-    <script src="/static/js/jquery-3.5.1.slim.min.js"></script>
-    <script src="/static/js/popper.min.js"></script>
-    <script src="/static/js/bootstrap.min.js"></script>
-    <script src="/static/js/vue.js"></script>
-    <script src="/static/js/axios.min.js"></script>
+    <script src="static/js/jquery-3.5.1.slim.min.js"></script>
+    <script src="static/js/popper.min.js"></script>
+    <script src="static/js/bootstrap.min.js"></script>
+    <script src="static/js/vue.js"></script>
+    <script src="static/js/axios.min.js"></script>
 </head>
 <body>
 <div class="container" id="app">
@@ -57,7 +57,7 @@
         methods: {
             selectDocument(v) {
                 this.docId = v;
-                axios.get('/api/sentences/' + v).then((res) => {
+                axios.get('api/sentences/' + v).then((res) => {
                     this.sentences = res.data;
                     this.text = this.sentences.map(s => s["words"].map(x => x[0]).join(" ")).join(" ");
                 }).catch((error) => {
@@ -71,7 +71,7 @@
                 if (this.text.length <= 0) {
                     return
                 }
-                axios.post('/api/parser', {
+                axios.post('api/parser', {
                     'text': this.text
                 }).then((res) => {
                     this.relations = res.data;
@@ -79,7 +79,7 @@
             }
         },
         created() {
-            axios.get('/api/docs').then((res) => {
+            axios.get('api/docs').then((res) => {
                 this.documents = res.data;
             })
         },
