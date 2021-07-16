@@ -20,7 +20,13 @@
 <div class="container" id="app">
     {% include 'navbar.html' %}
     <div class="d-block">
-        <h2>Documents</h2>
+        <h2>Gold-Documents</h2>
+        <div class="d-block">
+            <div class="form-check form-check-inline" v-for="corpus in corpora">
+                <input :value="corpus" class="form-check-input" type="radio" v-model="selectedCorpus">
+                <label class="form-check-label">${ corpus }</label>
+            </div>
+        </div>
         <div class="search-wrapper panel-heading">
             <input class="form-control" type="text" v-model="searchQuery" placeholder="Search"/>
         </div>
@@ -83,6 +89,8 @@
             docId: "",
             sentences: null,
             relations: [],
+            selectedCorpus: "",
+            corpora: [],
             documents: "",
             searchQuery: null,
             relationTypes: [],
@@ -108,7 +116,15 @@
         created() {
             axios.get('api/docs', {params: {part: "gold"}}).then((res) => {
                 this.documents = res.data;
-            })
+            }).catch((error) => {
+                console.error(error);
+            });
+            axios.get('api/corpora').then((res) => {
+                this.corpora = res.data.gold.map(i => i.corpus);
+            }).catch((error) => {
+                console.error(error);
+            });
+
         },
         computed: {
             resultQuery() {
