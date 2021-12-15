@@ -13,6 +13,7 @@ arg_parser = ArgumentParser()
 arg_parser.add_argument("--root-path", default="", type=str, help="REST API hostname")
 arg_parser.add_argument("--hostname", default="0.0.0.0", type=str, help="REST API hostname")
 arg_parser.add_argument("--port", default=8080, type=int, help="REST API port")
+arg_parser.add_argument("--bert-port", default=8081, type=int, help="REST API port")
 arg_parser.add_argument("--limit", default=100, type=int, help="number of documents per corpus")
 arg_parser.add_argument("--reload", action="store_true", help="Reload service on file changes")
 args = arg_parser.parse_args()
@@ -110,7 +111,7 @@ class ParserRequest(BaseModel):
 @app.post("/api/parser")
 def apply_parser(r: ParserRequest):
     db = MongoClient('localhost', 27017)['discopy']['requests']
-    r = requests.post('http://localhost:5000/api/parser', json={
+    r = requests.post(f'http://localhost:{args.bert_port}/api/parser', json={
         'text': r.text,
     })
     if r.status_code == 200:

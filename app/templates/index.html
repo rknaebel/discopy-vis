@@ -19,18 +19,129 @@
 <body>
 <div class="container" id="app">
     {% include 'navbar.html' %}
-    <div>
-        <h1>Shallow Discourse Parsing (Discopy)</h1>
-        <span>Some description...</span>
+    <div class="row">
+        <div class="col">
+            <h1>Shallow Discourse Parsing (<a href="https://www.cs.brandeis.edu/~clp/conll15st/intro.html">source</a>)
+            </h1>
+            <p>
+                A typical text consists of sentences that are glued together in a systematic way to form a coherent
+                discourse. Shallow discourse parsing is the task of parsing a piece of text into a set of discourse
+                relations between two adjacent or non-adjacent discourse units. We call this task shallow discourse
+                parsing because the relations in a text are not connected to one another to form a connected structure
+                in the form of a tree or graph.
+            </p>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col">
+            <h2>The Penn Discourse Treebank</h2>
+            <p>
+                There are alternative conceptions of the discourse structure and discourse annotated corpora come in
+                different flavors. For the CoNLL Shared Task this year, we chose to use the Penn Discourse
+                Treebank as the shared task data set as it is the largest corpus of its kind.
+                The PDTB annotates a text with a set of discourse relations.
+                A discourse relation is composed of:
+            </p>
+            <ul>
+                <li>a discourse connective, which can be a coordinating conjunction (e.g., "and", "but"), subordinating
+                    conjunction (e.g. "if", "because"), or a discourse adverbial (e.g., "however", "also"). In an
+                    implicit discourse relation, a discourse connective is omitted.
+                </li>
+                <li>two Arguments of the discourse connective, Arg1 and Arg2, which are typically text spans the size
+                    of clauses or sentences.
+                </li>
+                <li>the sense of the discourse connective, which characterizes the nature of the relationship between
+                    the two arguments of the connective (e.g., contrast, instantiation, temporal precedence).
+                </li>
+            </ul>
+            <h2>Examples of discourse relations</h2>
+            Here is a paragraph taken from the document wsj_1000 in the PDTB.
+            A shallow discourse parser will output a bunch of discourse relations, which can be visualized below.
+            <span class="arg1"> Arg1 is shown in red</span>, and <span class="arg2">Arg 2 is shown in blue.</span>
+            <span class="connective">The discourse connective is underlined.</span>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col">
+            <h3> Explicit Discourse Relations </h3>
+            <p class="example">
+                According to Lawrence Eckenfelder, a securities industry analyst at Prudential-Bache Securities Inc.,
+                "Kemper is the first firm to make a major statement with program trading." He added that
+                <span class="arg1">"having just one firm do this isn't going to mean a hill of beans</span>.
+                <span class="connective">But</span>
+                <span class="arg2">if this prompts others to consider the same thing, then it may become much more important</span>."
+            </p>
+            <p>The discourse connective is 'but', and the sense is <b>Comparison.Concession</b>.</p>
+        </div>
+        <div class="col">
+            <h3> Implicit Discourse Relations </h3>
+            <p class="example">
+                According to Lawrence Eckenfelder, a securities industry analyst at Prudential-Bache Securities Inc.,
+                <span class="arg1">"Kemper is the first firm to make a major statement with program trading</span>."
+                He added
+                <span class="arg2">that "having just one firm do this isn't going to mean a hill of beans</span>.
+                But if this prompts others to consider the same thing, then it may become much more important."
+            </p>
+            <p>
+                The omitted discourse connective is 'however'. and
+                the sense is <b>Comparison.Contrast</b>.
+            </p>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col">
+            <h2>Corpora</h2>
+            <p>Following lists a list of available corpora within the database.</p>
+            <table class="table">
+                <thead>
+                <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Corpus</th>
+                    <th scope="col">#Docs</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr v-for="(stat, index) in stats.gold">
+                    <th scope="row">${ index + 1 }</th>
+                    <td>${ stat.corpus }</td>
+                    <td>${ stat.count }</td>
+                </tr>
+                </tbody>
+            </table>
+            <p>Parsed corpora contain above available collections as well as texts without gold annotation:</p>
+            <table class="table">
+                <thead>
+                <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Corpus</th>
+                    <th scope="col">#Docs</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr v-for="(stat, index) in stats.pred">
+                    <th scope="row">${ index + 1 }</th>
+                    <td>${ stat.corpus }</td>
+                    <td>${ stat.count }</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 <script>
     var app = new Vue({
         el: '#app',
         delimiters: ['${', '}'],
-        data: {},
+        data: {
+            stats: {},
+        },
         methods: {},
         created() {
+            axios.get('api/corpora').then((res) => {
+                this.stats = res.data;
+            }).catch((error) => {
+                console.error(error);
+            });
         },
         computed: {}
     })
