@@ -1,0 +1,5 @@
+First install the requirments use the following :
+` pip install -r requirments.txt`
+
+Second sometimes you have werkzeug in your machine, however deu to some depend
+`pip uninstall werkzeug`
